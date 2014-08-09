@@ -31,9 +31,8 @@ module Philiprehberger
           chunk = Chunk.new(items: slice, index: index)
           block.call(chunk)
 
-          chunk_errors = process_chunk(chunk)
-          errors.concat(chunk_errors)
-          processed += slice.size - chunk_errors.size
+          errors.concat(chunk.errors)
+          processed += slice.size - chunk.errors.size
 
           notify_progress(chunk, index, chunks.size, processed, items.size)
         end
@@ -48,19 +47,6 @@ module Philiprehberger
       end
 
       private
-
-      def process_chunk(chunk)
-        errors = []
-        chunk.each do |item|
-          # Items are yielded through the chunk's each method;
-          # the user processes them in their block.
-          # Error handling is done via the on_error callback.
-        rescue StandardError => e
-          errors << { item: item, error: e }
-          chunk.error_callback&.call(item, e)
-        end
-        errors
-      end
 
       def notify_progress(chunk, index, total_chunks, processed, total_items)
         return unless chunk.progress_callback
