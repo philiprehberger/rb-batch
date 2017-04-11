@@ -232,8 +232,7 @@ RSpec.describe Philiprehberger::Batch do
 
     it 'iterates over items' do
       chunk = described_class.new(items: %w[a b], index: 0)
-      collected = []
-      chunk.each { |item| collected << item }
+      collected = chunk.map { |item| item }
       expect(collected).to eq(%w[a b])
     end
 
@@ -284,7 +283,8 @@ RSpec.describe Philiprehberger::Batch do
     end
 
     it 'reports failure when errors exist' do
-      result = described_class.new(processed: 4, errors: [{ item: 1, error: RuntimeError.new }], total: 5, chunks: 1, elapsed: 0.1)
+      result = described_class.new(processed: 4, errors: [{ item: 1, error: RuntimeError.new }], total: 5, chunks: 1,
+                                   elapsed: 0.1)
       expect(result).not_to be_success
     end
 
