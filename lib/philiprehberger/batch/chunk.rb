@@ -4,6 +4,8 @@ module Philiprehberger
   module Batch
     # Represents a single chunk of items within a batch.
     class Chunk
+      include Enumerable
+
       # @return [Array] items in this chunk
       attr_reader :items
 
