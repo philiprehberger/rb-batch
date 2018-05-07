@@ -14,10 +14,11 @@ module Philiprehberger
     # @param collection [Array, Enumerable] items to process
     # @param size [Integer] chunk size
     # @param concurrency [Integer] number of concurrent workers
+    # @param retries [Integer] max retries per failed item (default: 0)
     # @yield [chunk] block that receives a Chunk for processing
     # @return [Result] processing result
-    def self.process(collection, size: 100, concurrency: 1, &block)
-      processor = Processor.new(size: size, concurrency: concurrency)
+    def self.process(collection, size: 100, concurrency: 1, retries: 0, &block)
+      processor = Processor.new(size: size, concurrency: concurrency, retries: retries)
       processor.call(collection, &block)
     end
   end

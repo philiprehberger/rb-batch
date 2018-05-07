@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-03-29
+
+### Added
+- Early termination via error handler returning `:halt` to stop processing remaining chunks
+- `Result#halted?` to check if processing was halted early
+- Retry per chunk with `retries:` parameter and exponential backoff
+- Only failed items within a chunk are retried, not the whole chunk
+- `Result#results` collects return values from each processed item
+- `Result#flat_map` to map over all results and flatten one level
+- `Result#counts` to count occurrences of each result value
+- `Result#group_by` to group results by block return value
+- Result is now Enumerable over collected item results
+
 ## [0.1.2] - 2026-03-24
 
 ### Fixed
