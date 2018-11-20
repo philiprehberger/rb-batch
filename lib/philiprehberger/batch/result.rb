@@ -59,33 +59,31 @@ module Philiprehberger
       #
       # @yield [item_result] each result value
       # @return [Enumerator] if no block given
-      def each(&block)
-        @results.each(&block)
+      def each(&)
+        @results.each(&)
       end
 
       # Map over all collected item results and flatten one level.
       #
       # @yield [item_result] each result value
       # @return [Array] flattened mapped results
-      def flat_map(&block)
-        @results.flat_map(&block)
+      def flat_map(&)
+        @results.flat_map(&)
       end
 
       # Count occurrences of each result value.
       #
       # @return [Hash] counts keyed by result value
       def counts
-        @results.each_with_object(Hash.new(0)) do |item_result, hash|
-          hash[item_result] += 1
-        end
+        @results.tally
       end
 
       # Group results by the return value of the block.
       #
       # @yield [item_result] each result value
       # @return [Hash] grouped results
-      def group_by(&block)
-        @results.group_by(&block)
+      def group_by(&)
+        @results.group_by(&)
       end
     end
   end
