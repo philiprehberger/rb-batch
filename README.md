@@ -92,11 +92,22 @@ result.flat_map { |status| [status] }      # => [:active, :active, :inactive, ..
 result.group_by { |status| status }        # => { active: [...], inactive: [...] }
 ```
 
+### Concurrency
+
+```ruby
+result = Philiprehberger::Batch.process(records, size: 100, concurrency: 4) do |batch|
+  batch.each { |record| api_call(record) }
+end
+
+result.processed  # => total successful across all threads
+result.results    # => collected in chunk order
+```
+
 ## API
 
 | Method / Class | Description |
 |--------|-------------|
-| `.process(collection, size:, retries:) { \|batch\| }` | Process collection in chunks |
+| `.process(collection, size:, concurrency:, retries:) { \|batch\| }` | Process collection in chunks |
 | `Chunk#each { \|item\| }` | Iterate over items in the chunk |
 | `Chunk#on_progress { \|info\| }` | Register progress callback |
 | `Chunk#on_error { \|item, err\| }` | Register error callback (return `:halt` to stop) |
