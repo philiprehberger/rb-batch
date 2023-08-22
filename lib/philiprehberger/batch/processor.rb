@@ -20,13 +20,15 @@ module Philiprehberger
       # Process a collection in batches.
       #
       # @param collection [Array, Enumerable] items to process
+      # @param on_progress [Proc, nil] optional callback invoked after each chunk with a progress info hash
       # @yield [chunk] block that receives a Chunk object for processing
       # @return [Result] processing result
-      def call(collection, &block)
+      def call(collection, on_progress: nil, &block)
         raise Error, 'a processing block is required' unless block
 
         items = collection.to_a
         slices = items.each_slice(@size).to_a
+        @on_progress = on_progress
 
         if @concurrency > 1 && slices.size > 1
           call_concurrent(slices, items, &block)
@@ -61,6 +63,7 @@ module Philiprehberger
           end
 
           notify_progress(chunk, index, slices.size, processed, items.size) unless halted
+          notify_global_progress(index, slices.size, processed, items.size) unless halted
         end
 
         Result.new(
@@ -103,6 +106,10 @@ module Philiprehberger
               mutex.synchronize do
                 chunk_slots[index] = chunk
                 halted = true if chunk.halted?
+                done = chunk_slots.count { |c| !c.nil? }
+                processed_so_far = chunk_slots.compact.sum { |c| c.items.size - c.errors.size }
+                notify_global_progress(index, slices.size, processed_so_far, items.size) unless halted
+                _ = done
               end
             end
           end
@@ -139,6 +146,18 @@ module Philiprehberger
           halted: halted,
           results: results
         )
+      end
+
+      def notify_global_progress(index, total_chunks, processed, total_items)
+        return unless @on_progress
+
+        @on_progress.call({
+                            chunk_index: index,
+                            total_chunks: total_chunks,
+                            processed: processed,
+                            total_items: total_items,
+                            percentage: total_items.zero? ? 100.0 : (processed.to_f / total_items * 100).round(1)
+                          })
       end
 
       def notify_progress(chunk, index, total_chunks, processed, total_items)

@@ -106,6 +106,19 @@ RSpec.describe Philiprehberger::Batch do
     end
   end
 
+  describe 'on_progress option' do
+    it 'calls the top-level on_progress after each chunk' do
+      reports = []
+      described_class.process((1..6).to_a, size: 2, on_progress: ->(info) { reports << info }) do |batch|
+        batch.each { |_| nil }
+      end
+
+      expect(reports.size).to eq(3)
+      expect(reports.last[:processed]).to eq(6)
+      expect(reports.last[:percentage]).to eq(100.0)
+    end
+  end
+
   describe 'progress tracking' do
     it 'calls on_progress callback for each chunk' do
       progress_reports = []
