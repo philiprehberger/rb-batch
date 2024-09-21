@@ -56,6 +56,31 @@ RSpec.describe Philiprehberger::Batch do
       expect(result.elapsed).to be >= 0
     end
 
+    it 'provides timing statistics from process' do
+      result = described_class.process((1..6).to_a, size: 2) do |batch|
+        batch.each { |_| nil }
+      end
+
+      stats = result.timing
+      expect(stats[:total]).to be_a(Float)
+      expect(stats[:total]).to be >= 0
+      expect(stats[:per_chunk]).to be_a(Float)
+      expect(stats[:per_item]).to be_a(Float)
+      expect(stats[:fastest_chunk]).to be_a(Float)
+      expect(stats[:slowest_chunk]).to be_a(Float)
+      expect(stats[:fastest_chunk]).to be <= stats[:slowest_chunk]
+    end
+
+    it 'provides timing statistics with concurrency' do
+      result = described_class.process((1..6).to_a, size: 2, concurrency: 2) do |batch|
+        batch.each { |_| nil }
+      end
+
+      stats = result.timing
+      expect(stats[:total]).to be >= 0
+      expect(stats[:fastest_chunk]).to be <= stats[:slowest_chunk]
+    end
+
     it 'handles single item collection' do
       processed = []
       result = described_class.process([42], size: 10) do |batch|
@@ -704,6 +729,69 @@ RSpec.describe Philiprehberger::Batch do
       result = described_class.new(processed: 3, errors: [], total: 3, chunks: 1, elapsed: 0.1,
                                    results: [10, 20, 30])
       expect(result.results).to eq([10, 20, 30])
+    end
+
+    describe '#timing' do
+      it 'returns a hash with all timing keys' do
+        result = described_class.new(processed: 6, errors: [], total: 6, chunks: 3, elapsed: 0.9,
+                                     chunk_times: [0.2, 0.3, 0.4])
+        stats = result.timing
+
+        expect(stats).to be_a(Hash)
+        expect(stats.keys).to contain_exactly(:total, :per_chunk, :per_item, :fastest_chunk, :slowest_chunk)
+      end
+
+      it 'returns total equal to elapsed' do
+        result = described_class.new(processed: 4, errors: [], total: 4, chunks: 2, elapsed: 1.0,
+                                     chunk_times: [0.4, 0.6])
+        expect(result.timing[:total]).to eq(1.0)
+      end
+
+      it 'calculates per_chunk as elapsed / number of chunks' do
+        result = described_class.new(processed: 6, errors: [], total: 6, chunks: 3, elapsed: 0.9,
+                                     chunk_times: [0.2, 0.3, 0.4])
+        expect(result.timing[:per_chunk]).to be_within(0.0001).of(0.3)
+      end
+
+      it 'calculates per_item as elapsed / total items' do
+        result = described_class.new(processed: 4, errors: [], total: 8, chunks: 2, elapsed: 2.0,
+                                     chunk_times: [0.8, 1.2])
+        expect(result.timing[:per_item]).to eq(0.25)
+      end
+
+      it 'returns fastest and slowest chunk times' do
+        result = described_class.new(processed: 6, errors: [], total: 6, chunks: 3, elapsed: 1.5,
+                                     chunk_times: [0.3, 0.5, 0.7])
+        expect(result.timing[:fastest_chunk]).to eq(0.3)
+        expect(result.timing[:slowest_chunk]).to eq(0.7)
+      end
+
+      it 'returns zeros when no chunks were processed' do
+        result = described_class.new(processed: 0, errors: [], total: 0, chunks: 0, elapsed: 0.0)
+        stats = result.timing
+
+        expect(stats[:total]).to eq(0.0)
+        expect(stats[:per_chunk]).to eq(0.0)
+        expect(stats[:per_item]).to eq(0.0)
+        expect(stats[:fastest_chunk]).to eq(0.0)
+        expect(stats[:slowest_chunk]).to eq(0.0)
+      end
+
+      it 'handles a single chunk' do
+        result = described_class.new(processed: 3, errors: [], total: 3, chunks: 1, elapsed: 0.5,
+                                     chunk_times: [0.5])
+        stats = result.timing
+
+        expect(stats[:per_chunk]).to eq(0.5)
+        expect(stats[:fastest_chunk]).to eq(0.5)
+        expect(stats[:slowest_chunk]).to eq(0.5)
+      end
+
+      it 'returns per_item as 0.0 when total is zero' do
+        result = described_class.new(processed: 0, errors: [], total: 0, chunks: 0, elapsed: 0.0,
+                                     chunk_times: [])
+        expect(result.timing[:per_item]).to eq(0.0)
+      end
     end
 
     describe '#success_rate' do

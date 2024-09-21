@@ -31,7 +31,8 @@ module Philiprehberger
       # @param elapsed [Float] elapsed time
       # @param halted [Boolean] whether processing was halted early
       # @param results [Array] collected results from processing
-      def initialize(processed:, errors:, total:, chunks:, elapsed:, halted: false, results: [])
+      # @param chunk_times [Array<Float>] per-chunk elapsed durations
+      def initialize(processed:, errors:, total:, chunks:, elapsed:, halted: false, results: [], chunk_times: [])
         @processed = processed
         @errors = errors
         @total = total
@@ -39,6 +40,7 @@ module Philiprehberger
         @elapsed = elapsed
         @halted = halted
         @results = results
+        @chunk_times = chunk_times
       end
 
       # Check if all items were processed without errors.
@@ -95,6 +97,29 @@ module Philiprehberger
         return 1.0 if @total.zero?
 
         @processed.to_f / @total
+      end
+
+      # Timing statistics for the batch run.
+      #
+      # @return [Hash] timing breakdown with :total, :per_chunk, :per_item, :fastest_chunk, :slowest_chunk
+      def timing
+        if @chunk_times.empty?
+          return {
+            total: @elapsed,
+            per_chunk: 0.0,
+            per_item: 0.0,
+            fastest_chunk: 0.0,
+            slowest_chunk: 0.0
+          }
+        end
+
+        {
+          total: @elapsed,
+          per_chunk: @elapsed / @chunk_times.size,
+          per_item: @total.zero? ? 0.0 : @elapsed / @total,
+          fastest_chunk: @chunk_times.min,
+          slowest_chunk: @chunk_times.max
+        }
       end
     end
   end
