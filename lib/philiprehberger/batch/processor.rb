@@ -55,7 +55,7 @@ module Philiprehberger
           chunk_start = now
           chunk = Chunk.new(items: slice, index: index, retries: @retries)
           block.call(chunk)
-          chunk_times << now - chunk_start
+          chunk_times << (now - chunk_start)
 
           errors.concat(chunk.errors)
           results.concat(chunk.results)
