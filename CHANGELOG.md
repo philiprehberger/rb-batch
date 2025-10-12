@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-04-16
+
+### Added
+- `timeout_per_chunk:` option on `Batch.process` — when a chunk exceeds the timeout it is interrupted, a `Philiprehberger::Batch::TimeoutError` is appended to `Result#errors`, and processing continues with the next chunk
+- `Philiprehberger::Batch::TimeoutError` error class (subclass of `Philiprehberger::Batch::Error`)
+
 ## [0.6.0] - 2026-04-15
 
 ### Added

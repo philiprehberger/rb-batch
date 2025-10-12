@@ -130,6 +130,19 @@ puts stats[:fastest_chunk]  # => shortest chunk duration
 puts stats[:slowest_chunk]  # => longest chunk duration
 ```
 
+### Timeout Per Chunk
+
+```ruby
+result = Philiprehberger::Batch.process(items, size: 100, timeout_per_chunk: 30) do |batch|
+  batch.each { |item| slow_external_call(item) }
+end
+
+# Chunks that exceed 30 seconds are interrupted. The TimeoutError is captured
+# in result.errors; items from that chunk are NOT counted in result.processed.
+# Processing continues with the remaining chunks.
+timeout_errors = result.errors.select { |e| e[:error].is_a?(Philiprehberger::Batch::TimeoutError) }
+```
+
 ### Concurrency
 
 ```ruby
@@ -145,7 +158,8 @@ result.results    # => collected in chunk order
 
 | Method / Class | Description |
 |--------|-------------|
-| `.process(collection, size:, concurrency:, retries:, on_progress:) { \|batch\| }` | Process collection in chunks (optional top-level progress callback) |
+| `.process(collection, size:, concurrency:, retries:, timeout_per_chunk:, on_progress:) { \|batch\| }` | Process collection in chunks (optional top-level progress callback and per-chunk timeout) |
+| `Batch::TimeoutError` | Raised internally and captured in `Result#errors` when a chunk exceeds `timeout_per_chunk` |
 | `Chunk#each { \|item\| }` | Iterate over items in the chunk |
 | `Chunk#on_progress { \|info\| }` | Register progress callback |
 | `Chunk#on_error { \|item, err\| }` | Register error callback (return `:halt` to stop) |

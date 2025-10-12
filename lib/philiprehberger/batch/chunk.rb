@@ -91,6 +91,8 @@ module Philiprehberger
         attempt = 0
         begin
           block.call(item)
+        rescue Philiprehberger::Batch::TimeoutError
+          raise
         rescue StandardError => e
           if attempt < @retries
             attempt += 1

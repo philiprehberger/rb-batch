@@ -502,6 +502,79 @@ RSpec.describe Philiprehberger::Batch do
     end
   end
 
+  describe 'timeout_per_chunk option' do
+    it 'is backward compatible when timeout_per_chunk is nil (default)' do
+      result = described_class.process([1, 2, 3], size: 2) do |batch|
+        batch.each { |item| item }
+      end
+
+      expect(result).to be_success
+      expect(result.processed).to eq(3)
+    end
+
+    it 'defines a TimeoutError subclass of Error' do
+      expect(Philiprehberger::Batch::TimeoutError.ancestors).to include(Philiprehberger::Batch::Error)
+    end
+
+    it 'interrupts a chunk whose processing exceeds the timeout' do
+      result = described_class.process([1, 2], size: 2, timeout_per_chunk: 0.05) do |batch|
+        batch.each do |_item|
+          sleep(0.5)
+        end
+      end
+
+      expect(result.errors.size).to eq(1)
+      expect(result.errors.first[:error]).to be_a(Philiprehberger::Batch::TimeoutError)
+    end
+
+    it 'does NOT count timed-out chunk items as processed' do
+      result = described_class.process([1, 2, 3, 4], size: 2, timeout_per_chunk: 0.05) do |batch|
+        batch.each do |item|
+          sleep(0.5) if item == 1
+        end
+      end
+
+      # First chunk [1, 2] times out -> not processed.
+      # Second chunk [3, 4] should process normally.
+      expect(result.processed).to eq(2)
+    end
+
+    it 'continues processing the next chunk after a timed-out chunk' do
+      completed = []
+      result = described_class.process([1, 2, 3, 4], size: 2, timeout_per_chunk: 0.05) do |batch|
+        batch.each do |item|
+          if item == 1
+            sleep(0.5)
+          else
+            completed << item
+          end
+        end
+      end
+
+      expect(completed).to include(3, 4)
+      expect(result.errors.size).to eq(1)
+    end
+
+    it 'records the chunk items in the error entry for a timeout' do
+      result = described_class.process([1, 2, 3], size: 3, timeout_per_chunk: 0.05) do |batch|
+        batch.each { |_| sleep(0.5) }
+      end
+
+      timeout_entry = result.errors.find { |e| e[:error].is_a?(Philiprehberger::Batch::TimeoutError) }
+      expect(timeout_entry[:item]).to eq([1, 2, 3])
+    end
+
+    it 'raises when timeout_per_chunk is not positive' do
+      expect { described_class.process([1], size: 1, timeout_per_chunk: 0) { |b| b.each { |_| nil } } }
+        .to raise_error(Philiprehberger::Batch::Error, /timeout_per_chunk/)
+    end
+
+    it 'raises when timeout_per_chunk is not numeric' do
+      expect { described_class.process([1], size: 1, timeout_per_chunk: 'abc') { |b| b.each { |_| nil } } }
+        .to raise_error(Philiprehberger::Batch::Error, /timeout_per_chunk/)
+    end
+  end
+
   describe 'concurrency' do
     it 'processes all items with concurrency > 1' do
       processed = Mutex.new
