@@ -17,14 +17,23 @@ module Philiprehberger
         @index = index
         @progress_callback = nil
         @error_callback = nil
+        @errors = []
       end
 
-      # Iterate over items in the chunk.
+      # @return [Array<Hash>] errors collected during iteration
+      attr_reader :errors
+
+      # Iterate over items in the chunk, capturing errors per item.
       #
       # @yield [item] each item in the chunk
       # @return [void]
       def each(&block)
-        @items.each(&block)
+        @items.each do |item|
+          block.call(item)
+        rescue StandardError => e
+          @errors << { item: item, error: e }
+          @error_callback&.call(item, e)
+        end
       end
 
       # Register a progress callback.
@@ -35,12 +44,14 @@ module Philiprehberger
         @progress_callback = block
       end
 
-      # Register an error callback.
+      # Register an error callback. If errors have already been collected,
+      # the callback is invoked retroactively for each one.
       #
       # @yield [item, error] called when an item fails
       # @return [void]
       def on_error(&block)
         @error_callback = block
+        @errors.each { |err| block.call(err[:item], err[:error]) }
       end
 
       # @api private
