@@ -3,6 +3,7 @@
 [![Tests](https://github.com/philiprehberger/rb-batch/actions/workflows/ci.yml/badge.svg)](https://github.com/philiprehberger/rb-batch/actions/workflows/ci.yml)
 [![Gem Version](https://badge.fury.io/rb/philiprehberger-batch.svg)](https://rubygems.org/gems/philiprehberger-batch)
 [![License](https://img.shields.io/github/license/philiprehberger/rb-batch)](LICENSE)
+[![Sponsor](https://img.shields.io/badge/sponsor-GitHub%20Sponsors-ec6cb9)](https://github.com/sponsors/philiprehberger)
 
 Batch processing toolkit with chunking, progress, and error collection
 
