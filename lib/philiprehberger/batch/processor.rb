@@ -7,7 +7,7 @@ module Philiprehberger
       # @param size [Integer] chunk size
       # @param concurrency [Integer] number of concurrent workers (reserved for future use)
       def initialize(size: 100, concurrency: 1)
-        raise Error, 'size must be positive' unless size.is_a?(Integer) && size > 0
+        raise Error, 'size must be positive' unless size.is_a?(Integer) && size.positive?
 
         @size = size
         @concurrency = concurrency
@@ -52,12 +52,12 @@ module Philiprehberger
         return unless chunk.progress_callback
 
         chunk.progress_callback.call({
-          chunk_index: index,
-          total_chunks: total_chunks,
-          processed: processed,
-          total_items: total_items,
-          percentage: total_items.zero? ? 100.0 : (processed.to_f / total_items * 100).round(1)
-        })
+                                       chunk_index: index,
+                                       total_chunks: total_chunks,
+                                       processed: processed,
+                                       total_items: total_items,
+                                       percentage: total_items.zero? ? 100.0 : (processed.to_f / total_items * 100).round(1)
+                                     })
       end
 
       def now
