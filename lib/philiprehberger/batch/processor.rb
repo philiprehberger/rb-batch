@@ -6,11 +6,14 @@ module Philiprehberger
     class Processor
       # @param size [Integer] chunk size
       # @param concurrency [Integer] number of concurrent workers (reserved for future use)
-      def initialize(size: 100, concurrency: 1)
+      # @param retries [Integer] max retries per failed item (default: 0)
+      def initialize(size: 100, concurrency: 1, retries: 0)
         raise Error, 'size must be positive' unless size.is_a?(Integer) && size.positive?
+        raise Error, 'retries must be non-negative' unless retries.is_a?(Integer) && retries >= 0
 
         @size = size
         @concurrency = concurrency
+        @retries = retries
       end
 
       # Process a collection in batches.
@@ -22,27 +25,42 @@ module Philiprehberger
         raise Error, 'a processing block is required' unless block
 
         items = collection.to_a
-        chunks = items.each_slice(@size).to_a
+        slices = items.each_slice(@size).to_a
         errors = []
+        results = []
         processed = 0
+        halted = false
+        chunks_processed = 0
         start_time = now
 
-        chunks.each_with_index do |slice, index|
-          chunk = Chunk.new(items: slice, index: index)
+        slices.each_with_index do |slice, index|
+          break if halted
+
+          chunk = Chunk.new(items: slice, index: index, retries: @retries)
           block.call(chunk)
 
           errors.concat(chunk.errors)
+          results.concat(chunk.results)
           processed += slice.size - chunk.errors.size
+          chunks_processed += 1
 
-          notify_progress(chunk, index, chunks.size, processed, items.size)
+          if chunk.halted?
+            halted = true
+            # Don't count remaining unprocessed items from this chunk in errors
+            # Items that weren't reached due to halt are simply not processed
+          end
+
+          notify_progress(chunk, index, slices.size, processed, items.size) unless halted
         end
 
         Result.new(
           processed: processed,
           errors: errors,
           total: items.size,
-          chunks: chunks.size,
-          elapsed: now - start_time
+          chunks: chunks_processed,
+          elapsed: now - start_time,
+          halted: halted,
+          results: results
         )
       end
 
