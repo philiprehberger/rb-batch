@@ -10,8 +10,8 @@ Gem::Specification.new do |spec|
 
   spec.summary = 'Batch processing toolkit with chunking, progress, and error collection'
   spec.description = 'Processes collections in configurable chunks with progress tracking callbacks ' \
-                       'and per-item error collection. Returns detailed results including processed count, ' \
-                       'error entries, chunk count, and elapsed time.'
+                     'and per-item error collection. Returns detailed results including processed count, ' \
+                     'error entries, chunk count, and elapsed time.'
   spec.homepage = 'https://philiprehberger.com/open-source-packages/ruby/philiprehberger-batch'
   spec.license = 'MIT'
 
