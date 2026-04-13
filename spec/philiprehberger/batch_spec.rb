@@ -464,6 +464,109 @@ RSpec.describe Philiprehberger::Batch do
     end
   end
 
+  describe 'concurrency' do
+    it 'processes all items with concurrency > 1' do
+      processed = Mutex.new
+      collected = []
+      result = described_class.process((1..12).to_a, size: 3, concurrency: 3) do |batch|
+        batch.each do |item|
+          processed.synchronize { collected << item }
+        end
+      end
+
+      expect(collected.sort).to eq((1..12).to_a)
+      expect(result.processed).to eq(12)
+      expect(result.total).to eq(12)
+      expect(result.chunks).to eq(4)
+    end
+
+    it 'collects results in chunk order' do
+      result = described_class.process((1..6).to_a, size: 2, concurrency: 3) do |batch|
+        batch.each { |item| item * 10 }
+      end
+
+      expect(result.results).to eq([10, 20, 30, 40, 50, 60])
+    end
+
+    it 'collects errors across concurrent chunks' do
+      result = described_class.process((1..6).to_a, size: 2, concurrency: 2) do |batch|
+        batch.each { |item| raise "fail #{item}" if item.even? }
+      end
+
+      expect(result.errors.size).to eq(3)
+      expect(result.errors.map { |e| e[:item] }.sort).to eq([2, 4, 6])
+      expect(result.processed).to eq(3)
+    end
+
+    it 'halts stops remaining chunks' do
+      result = described_class.process((1..20).to_a, size: 1, concurrency: 2) do |batch|
+        batch.on_error { |_item, _err| :halt }
+        batch.each do |item|
+          raise 'stop' if item == 1
+        end
+      end
+
+      expect(result).to be_halted
+      expect(result.chunks).to be < 20
+    end
+
+    it 'falls back to sequential when only one chunk' do
+      result = described_class.process([1, 2, 3], size: 10, concurrency: 4) do |batch|
+        batch.each { |item| item }
+      end
+
+      expect(result.results).to eq([1, 2, 3])
+      expect(result.chunks).to eq(1)
+    end
+
+    it 'handles concurrency larger than number of chunks' do
+      result = described_class.process((1..4).to_a, size: 2, concurrency: 10) do |batch|
+        batch.each { |item| item }
+      end
+
+      expect(result.results).to eq([1, 2, 3, 4])
+      expect(result.chunks).to eq(2)
+    end
+
+    it 'concurrency 1 behaves identically to sequential' do
+      sequential = described_class.process((1..6).to_a, size: 2) do |batch|
+        batch.each { |item| item * 2 }
+      end
+
+      concurrent = described_class.process((1..6).to_a, size: 2, concurrency: 1) do |batch|
+        batch.each { |item| item * 2 }
+      end
+
+      expect(concurrent.results).to eq(sequential.results)
+      expect(concurrent.processed).to eq(sequential.processed)
+      expect(concurrent.chunks).to eq(sequential.chunks)
+    end
+
+    it 'validates concurrency is a positive integer' do
+      expect { described_class.process([1], size: 1, concurrency: 0) { |b| b.each { |_| nil } } }
+        .to raise_error(Philiprehberger::Batch::Error, /concurrency/)
+    end
+
+    it 'validates concurrency is not negative' do
+      expect { described_class.process([1], size: 1, concurrency: -1) { |b| b.each { |_| nil } } }
+        .to raise_error(Philiprehberger::Batch::Error, /concurrency/)
+    end
+
+    it 'validates concurrency is an integer' do
+      expect { described_class.process([1], size: 1, concurrency: 'abc') { |b| b.each { |_| nil } } }
+        .to raise_error(Philiprehberger::Batch::Error, /concurrency/)
+    end
+
+    it 'tracks elapsed time with concurrency' do
+      result = described_class.process((1..4).to_a, size: 2, concurrency: 2) do |batch|
+        batch.each { |_| nil }
+      end
+
+      expect(result.elapsed).to be_a(Float)
+      expect(result.elapsed).to be >= 0
+    end
+  end
+
   describe Philiprehberger::Batch::Chunk do
     it 'exposes items and index' do
       chunk = described_class.new(items: [1, 2, 3], index: 0)
@@ -535,6 +638,16 @@ RSpec.describe Philiprehberger::Batch do
     it 'raises on non-integer retries' do
       expect { described_class.new(size: 1, retries: 'abc') }
         .to raise_error(Philiprehberger::Batch::Error, /retries/)
+    end
+
+    it 'raises on zero concurrency' do
+      expect { described_class.new(size: 1, concurrency: 0) }
+        .to raise_error(Philiprehberger::Batch::Error, /concurrency/)
+    end
+
+    it 'raises on non-integer concurrency' do
+      expect { described_class.new(size: 1, concurrency: 1.5) }
+        .to raise_error(Philiprehberger::Batch::Error, /concurrency/)
     end
   end
 
