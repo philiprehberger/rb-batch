@@ -705,5 +705,36 @@ RSpec.describe Philiprehberger::Batch do
                                    results: [10, 20, 30])
       expect(result.results).to eq([10, 20, 30])
     end
+
+    describe '#success_rate' do
+      it 'returns 1.0 when all items succeed' do
+        result = described_class.new(processed: 5, errors: [], total: 5, chunks: 1, elapsed: 0.1)
+        expect(result.success_rate).to eq(1.0)
+      end
+
+      it 'returns 0.5 when half the items fail' do
+        errors = Array.new(2) { { item: nil, error: RuntimeError.new } }
+        result = described_class.new(processed: 2, errors: errors, total: 4, chunks: 1, elapsed: 0.1)
+        expect(result.success_rate).to eq(0.5)
+      end
+
+      it 'returns 0.0 when all items fail' do
+        errors = Array.new(3) { { item: nil, error: RuntimeError.new } }
+        result = described_class.new(processed: 0, errors: errors, total: 3, chunks: 1, elapsed: 0.1)
+        expect(result.success_rate).to eq(0.0)
+      end
+
+      it 'returns 1.0 for an empty batch' do
+        result = described_class.new(processed: 0, errors: [], total: 0, chunks: 0, elapsed: 0.0)
+        expect(result.success_rate).to eq(1.0)
+      end
+
+      it 'returns a Float in [0.0, 1.0]' do
+        result = described_class.new(processed: 1, errors: [{ item: nil, error: RuntimeError.new }],
+                                     total: 3, chunks: 1, elapsed: 0.1)
+        expect(result.success_rate).to be_a(Float)
+        expect(result.success_rate).to be_between(0.0, 1.0).inclusive
+      end
+    end
   end
 end

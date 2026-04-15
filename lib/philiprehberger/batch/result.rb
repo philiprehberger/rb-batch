@@ -85,6 +85,17 @@ module Philiprehberger
       def group_by(&)
         @results.group_by(&)
       end
+
+      # Ratio of successfully processed items to total items.
+      #
+      # Returns 1.0 for empty batches (no items to fail).
+      #
+      # @return [Float] value in the range [0.0, 1.0]
+      def success_rate
+        return 1.0 if @total.zero?
+
+        @processed.to_f / @total
+      end
     end
   end
 end

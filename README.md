@@ -104,6 +104,17 @@ result.flat_map { |status| [status] }      # => [:active, :active, :inactive, ..
 result.group_by { |status| status }        # => { active: [...], inactive: [...] }
 ```
 
+### Success Rate
+
+```ruby
+result = Philiprehberger::Batch.process(jobs, size: 50) do |batch|
+  batch.each { |job| job.execute! }
+end
+
+result.success_rate  # => 0.0..1.0 ratio of processed to total (1.0 when total is 0)
+puts "#{(result.success_rate * 100).round(1)}% succeeded"
+```
+
 ### Concurrency
 
 ```ruby
@@ -134,6 +145,7 @@ result.results    # => collected in chunk order
 | `Result#flat_map { \|r\| }` | Map over results and flatten |
 | `Result#counts` | Hash counting occurrences of each result value |
 | `Result#group_by { \|r\| }` | Group results by block return value |
+| `Result#success_rate` | Ratio of processed to total as a Float in `[0.0, 1.0]` (`1.0` when empty) |
 
 ## Development
 
