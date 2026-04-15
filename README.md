@@ -48,6 +48,18 @@ result = Philiprehberger::Batch.process(items, size: 100) do |batch|
 end
 ```
 
+### Top-level Progress Callback
+
+Pass `on_progress:` at the call site to subscribe without touching every chunk:
+
+```ruby
+progress = ->(info) { puts "#{info[:percentage]}% (#{info[:processed]}/#{info[:total_items]})" }
+
+Philiprehberger::Batch.process(items, size: 100, on_progress: progress) do |batch|
+  batch.each { |item| process(item) }
+end
+```
+
 ### Error Collection
 
 ```ruby
@@ -107,7 +119,7 @@ result.results    # => collected in chunk order
 
 | Method / Class | Description |
 |--------|-------------|
-| `.process(collection, size:, concurrency:, retries:) { \|batch\| }` | Process collection in chunks |
+| `.process(collection, size:, concurrency:, retries:, on_progress:) { \|batch\| }` | Process collection in chunks (optional top-level progress callback) |
 | `Chunk#each { \|item\| }` | Iterate over items in the chunk |
 | `Chunk#on_progress { \|info\| }` | Register progress callback |
 | `Chunk#on_error { \|item, err\| }` | Register error callback (return `:halt` to stop) |
