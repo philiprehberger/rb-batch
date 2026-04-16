@@ -47,11 +47,15 @@ module Philiprehberger
         chunks_processed = 0
         start_time = now
 
+        chunk_times = []
+
         slices.each_with_index do |slice, index|
           break if halted
 
+          chunk_start = now
           chunk = Chunk.new(items: slice, index: index, retries: @retries)
           block.call(chunk)
+          chunk_times << now - chunk_start
 
           errors.concat(chunk.errors)
           results.concat(chunk.results)
@@ -73,7 +77,8 @@ module Philiprehberger
           chunks: chunks_processed,
           elapsed: now - start_time,
           halted: halted,
-          results: results
+          results: results,
+          chunk_times: chunk_times
         )
       end
 
@@ -85,6 +90,7 @@ module Philiprehberger
         mutex = Mutex.new
         halted = false
         chunk_slots = Array.new(slices.size)
+        chunk_time_slots = Array.new(slices.size)
         start_time = now
 
         threads = Array.new(workers) do
@@ -100,11 +106,14 @@ module Philiprehberger
               slice, index = entry
               break if mutex.synchronize { halted }
 
+              chunk_start = now
               chunk = Chunk.new(items: slice, index: index, retries: @retries)
               block.call(chunk)
+              chunk_elapsed = now - chunk_start
 
               mutex.synchronize do
                 chunk_slots[index] = chunk
+                chunk_time_slots[index] = chunk_elapsed
                 halted = true if chunk.halted?
                 done = chunk_slots.count { |c| !c.nil? }
                 processed_so_far = chunk_slots.compact.sum { |c| c.items.size - c.errors.size }
@@ -117,23 +126,25 @@ module Philiprehberger
 
         threads.each(&:join)
 
-        aggregate(chunk_slots, items.size, start_time)
+        aggregate(chunk_slots, chunk_time_slots, items.size, start_time)
       end
 
-      def aggregate(chunk_slots, total_items, start_time)
+      def aggregate(chunk_slots, chunk_time_slots, total_items, start_time)
         errors = []
         results = []
         processed = 0
         halted = false
         chunks_processed = 0
+        chunk_times = []
 
-        chunk_slots.each do |chunk|
+        chunk_slots.each_with_index do |chunk, i|
           next unless chunk
 
           errors.concat(chunk.errors)
           results.concat(chunk.results)
           processed += chunk.items.size - chunk.errors.size
           chunks_processed += 1
+          chunk_times << chunk_time_slots[i]
           halted = true if chunk.halted?
         end
 
@@ -144,7 +155,8 @@ module Philiprehberger
           chunks: chunks_processed,
           elapsed: now - start_time,
           halted: halted,
-          results: results
+          results: results,
+          chunk_times: chunk_times
         )
       end
 

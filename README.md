@@ -115,6 +115,21 @@ result.success_rate  # => 0.0..1.0 ratio of processed to total (1.0 when total i
 puts "#{(result.success_rate * 100).round(1)}% succeeded"
 ```
 
+### Timing Statistics
+
+```ruby
+result = Philiprehberger::Batch.process(records, size: 50) do |batch|
+  batch.each { |record| save(record) }
+end
+
+stats = result.timing
+puts stats[:total]          # => overall elapsed time in seconds
+puts stats[:per_chunk]      # => average time per chunk
+puts stats[:per_item]       # => average time per item
+puts stats[:fastest_chunk]  # => shortest chunk duration
+puts stats[:slowest_chunk]  # => longest chunk duration
+```
+
 ### Concurrency
 
 ```ruby
@@ -146,6 +161,7 @@ result.results    # => collected in chunk order
 | `Result#counts` | Hash counting occurrences of each result value |
 | `Result#group_by { \|r\| }` | Group results by block return value |
 | `Result#success_rate` | Ratio of processed to total as a Float in `[0.0, 1.0]` (`1.0` when empty) |
+| `Result#timing` | Hash of timing stats: `total`, `per_chunk`, `per_item`, `fastest_chunk`, `slowest_chunk` |
 
 ## Development
 

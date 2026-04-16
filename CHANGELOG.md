@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-04-15
+
+### Added
+- `Result#timing` — returns a hash of timing statistics: `total`, `per_chunk`, `per_item`, `fastest_chunk`, `slowest_chunk`
+
 ## [0.5.0] - 2026-04-15
 
 ### Added
