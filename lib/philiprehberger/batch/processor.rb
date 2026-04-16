@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require 'timeout'
+
 module Philiprehberger
   module Batch
     # Processes collections in chunks with progress tracking and error collection.
@@ -7,14 +9,19 @@ module Philiprehberger
       # @param size [Integer] chunk size
       # @param concurrency [Integer] number of concurrent workers (default: 1)
       # @param retries [Integer] max retries per failed item (default: 0)
-      def initialize(size: 100, concurrency: 1, retries: 0)
+      # @param timeout_per_chunk [Numeric, nil] optional per-chunk timeout in seconds
+      def initialize(size: 100, concurrency: 1, retries: 0, timeout_per_chunk: nil)
         raise Error, 'size must be positive' unless size.is_a?(Integer) && size.positive?
         raise Error, 'concurrency must be positive' unless concurrency.is_a?(Integer) && concurrency.positive?
         raise Error, 'retries must be non-negative' unless retries.is_a?(Integer) && retries >= 0
+        if !timeout_per_chunk.nil? && !(timeout_per_chunk.is_a?(Numeric) && timeout_per_chunk.positive?)
+          raise Error, 'timeout_per_chunk must be a positive numeric'
+        end
 
         @size = size
         @concurrency = concurrency
         @retries = retries
+        @timeout_per_chunk = timeout_per_chunk
       end
 
       # Process a collection in batches.
@@ -54,8 +61,22 @@ module Philiprehberger
 
           chunk_start = now
           chunk = Chunk.new(items: slice, index: index, retries: @retries)
-          block.call(chunk)
+          timed_out = false
+
+          begin
+            run_chunk(chunk, &block)
+          rescue Philiprehberger::Batch::TimeoutError => e
+            timed_out = true
+            errors << { item: slice, error: e }
+          end
+
           chunk_times << (now - chunk_start)
+
+          if timed_out
+            chunks_processed += 1
+            notify_global_progress(index, slices.size, processed, items.size) unless halted
+            next
+          end
 
           errors.concat(chunk.errors)
           results.concat(chunk.results)
@@ -91,6 +112,7 @@ module Philiprehberger
         halted = false
         chunk_slots = Array.new(slices.size)
         chunk_time_slots = Array.new(slices.size)
+        timeout_slots = Array.new(slices.size)
         start_time = now
 
         threads = Array.new(workers) do
@@ -108,12 +130,18 @@ module Philiprehberger
 
               chunk_start = now
               chunk = Chunk.new(items: slice, index: index, retries: @retries)
-              block.call(chunk)
+              timeout_error = nil
+              begin
+                run_chunk(chunk, &block)
+              rescue Philiprehberger::Batch::TimeoutError => e
+                timeout_error = e
+              end
               chunk_elapsed = now - chunk_start
 
               mutex.synchronize do
                 chunk_slots[index] = chunk
                 chunk_time_slots[index] = chunk_elapsed
+                timeout_slots[index] = timeout_error if timeout_error
                 halted = true if chunk.halted?
                 done = chunk_slots.count { |c| !c.nil? }
                 processed_so_far = chunk_slots.compact.sum { |c| c.items.size - c.errors.size }
@@ -126,10 +154,10 @@ module Philiprehberger
 
         threads.each(&:join)
 
-        aggregate(chunk_slots, chunk_time_slots, items.size, start_time)
+        aggregate(chunk_slots, chunk_time_slots, items.size, start_time, timeout_slots)
       end
 
-      def aggregate(chunk_slots, chunk_time_slots, total_items, start_time)
+      def aggregate(chunk_slots, chunk_time_slots, total_items, start_time, timeout_slots = [])
         errors = []
         results = []
         processed = 0
@@ -139,6 +167,13 @@ module Philiprehberger
 
         chunk_slots.each_with_index do |chunk, i|
           next unless chunk
+
+          if timeout_slots[i]
+            errors << { item: chunk.items, error: timeout_slots[i] }
+            chunks_processed += 1
+            chunk_times << chunk_time_slots[i]
+            next
+          end
 
           errors.concat(chunk.errors)
           results.concat(chunk.results)
@@ -186,6 +221,20 @@ module Philiprehberger
 
       def now
         Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      end
+
+      def run_chunk(chunk, &block)
+        if @timeout_per_chunk
+          Timeout.timeout(
+            @timeout_per_chunk,
+            Philiprehberger::Batch::TimeoutError,
+            "chunk #{chunk.index} exceeded #{@timeout_per_chunk}s timeout"
+          ) do
+            block.call(chunk)
+          end
+        else
+          block.call(chunk)
+        end
       end
     end
   end
