@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-04-16
+
+### Added
+- `Result#filter_errors(error_class)` — returns array of `{ item:, error: }` hashes where the error is an instance of the given class
+- `Result#errors_for(item)` — returns array of `{ item:, error: }` hashes for a specific item
+
 ## [0.7.0] - 2026-04-16
 
 ### Added

@@ -143,6 +143,32 @@ end
 timeout_errors = result.errors.select { |e| e[:error].is_a?(Philiprehberger::Batch::TimeoutError) }
 ```
 
+### Filtering Errors by Class
+
+```ruby
+result = Philiprehberger::Batch.process(items, size: 50) do |batch|
+  batch.each { |item| item.sync! }
+end
+
+timeout_errors = result.filter_errors(Philiprehberger::Batch::TimeoutError)
+timeout_errors.each { |e| puts "Chunk timed out: #{e[:item].inspect}" }
+
+arg_errors = result.filter_errors(ArgumentError)
+arg_errors.each { |e| puts "Bad argument for #{e[:item]}: #{e[:error].message}" }
+```
+
+### Errors for a Specific Item
+
+```ruby
+result = Philiprehberger::Batch.process(records, size: 50) do |batch|
+  batch.each { |record| record.save! }
+end
+
+result.errors_for(records.first).each do |entry|
+  puts "#{entry[:item]} failed: #{entry[:error].message}"
+end
+```
+
 ### Concurrency
 
 ```ruby
@@ -176,6 +202,8 @@ result.results    # => collected in chunk order
 | `Result#group_by { \|r\| }` | Group results by block return value |
 | `Result#success_rate` | Ratio of processed to total as a Float in `[0.0, 1.0]` (`1.0` when empty) |
 | `Result#timing` | Hash of timing stats: `total`, `per_chunk`, `per_item`, `fastest_chunk`, `slowest_chunk` |
+| `Result#filter_errors(error_class)` | Array of `{ item:, error: }` hashes where the error is an instance of the given class |
+| `Result#errors_for(item)` | Array of `{ item:, error: }` hashes for a specific item |
 
 ## Development
 
