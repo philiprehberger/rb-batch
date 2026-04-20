@@ -99,6 +99,22 @@ module Philiprehberger
         @processed.to_f / @total
       end
 
+      # Filter errors by error class.
+      #
+      # @param error_class [Class] the error class to filter by
+      # @return [Array<Hash>] error entries where the error is an instance of the given class
+      def filter_errors(error_class)
+        @errors.select { |entry| entry[:error].is_a?(error_class) }
+      end
+
+      # Return all error entries for a specific item.
+      #
+      # @param item [Object] the item to look up
+      # @return [Array<Hash>] error entries where the item matches
+      def errors_for(item)
+        @errors.select { |entry| entry[:item] == item }
+      end
+
       # Timing statistics for the batch run.
       #
       # @return [Hash] timing breakdown with :total, :per_chunk, :per_item, :fastest_chunk, :slowest_chunk

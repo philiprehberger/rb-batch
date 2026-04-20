@@ -897,5 +897,93 @@ RSpec.describe Philiprehberger::Batch do
         expect(result.success_rate).to be_between(0.0, 1.0).inclusive
       end
     end
+
+    describe '#filter_errors' do
+      it 'returns error entries matching the given error class' do
+        arg_err = ArgumentError.new('bad arg')
+        runtime_err = RuntimeError.new('boom')
+        errors = [{ item: 1, error: arg_err }, { item: 2, error: runtime_err }]
+        result = described_class.new(processed: 0, errors: errors, total: 2, chunks: 1, elapsed: 0.1)
+
+        filtered = result.filter_errors(ArgumentError)
+        expect(filtered.size).to eq(1)
+        expect(filtered.first[:item]).to eq(1)
+        expect(filtered.first[:error]).to be(arg_err)
+      end
+
+      it 'returns an empty array when no errors match the class' do
+        errors = [{ item: 1, error: RuntimeError.new('boom') }]
+        result = described_class.new(processed: 0, errors: errors, total: 1, chunks: 1, elapsed: 0.1)
+
+        expect(result.filter_errors(ArgumentError)).to eq([])
+      end
+
+      it 'returns all matching entries when multiple errors share the class' do
+        errors = [
+          { item: 1, error: ArgumentError.new('first') },
+          { item: 2, error: RuntimeError.new('other') },
+          { item: 3, error: ArgumentError.new('second') }
+        ]
+        result = described_class.new(processed: 0, errors: errors, total: 3, chunks: 1, elapsed: 0.1)
+
+        filtered = result.filter_errors(ArgumentError)
+        expect(filtered.size).to eq(2)
+        expect(filtered.map { |e| e[:item] }).to contain_exactly(1, 3)
+      end
+
+      it 'returns an empty array when there are no errors' do
+        result = described_class.new(processed: 3, errors: [], total: 3, chunks: 1, elapsed: 0.1)
+        expect(result.filter_errors(RuntimeError)).to eq([])
+      end
+
+      it 'matches subclass instances when filtering by superclass' do
+        timeout_err = Philiprehberger::Batch::TimeoutError.new('timed out')
+        errors = [{ item: [1, 2], error: timeout_err }]
+        result = described_class.new(processed: 0, errors: errors, total: 2, chunks: 1, elapsed: 0.1)
+
+        expect(result.filter_errors(Philiprehberger::Batch::Error).size).to eq(1)
+        expect(result.filter_errors(Philiprehberger::Batch::TimeoutError).size).to eq(1)
+      end
+    end
+
+    describe '#errors_for' do
+      it 'returns error entries for the specified item' do
+        err = RuntimeError.new('boom')
+        errors = [{ item: 'a', error: err }, { item: 'b', error: RuntimeError.new('other') }]
+        result = described_class.new(processed: 0, errors: errors, total: 2, chunks: 1, elapsed: 0.1)
+
+        found = result.errors_for('a')
+        expect(found.size).to eq(1)
+        expect(found.first[:item]).to eq('a')
+        expect(found.first[:error]).to be(err)
+      end
+
+      it 'returns an empty array when no errors match the item' do
+        errors = [{ item: 1, error: RuntimeError.new('boom') }]
+        result = described_class.new(processed: 0, errors: errors, total: 1, chunks: 1, elapsed: 0.1)
+
+        expect(result.errors_for(99)).to eq([])
+      end
+
+      it 'returns multiple entries when the same item appears more than once' do
+        err1 = RuntimeError.new('first')
+        err2 = ArgumentError.new('second')
+        errors = [
+          { item: 42, error: err1 },
+          { item: 7, error: RuntimeError.new('other') },
+          { item: 42, error: err2 }
+        ]
+        result = described_class.new(processed: 0, errors: errors, total: 3, chunks: 1, elapsed: 0.1)
+
+        found = result.errors_for(42)
+        expect(found.size).to eq(2)
+        expect(found.map { |e| e[:error] }).to contain_exactly(err1, err2)
+      end
+
+      it 'returns an empty array when there are no errors' do
+        result = described_class.new(processed: 3, errors: [], total: 3, chunks: 1, elapsed: 0.1)
+        expect(result.errors_for(1)).to eq([])
+      end
+    end
   end
 end
