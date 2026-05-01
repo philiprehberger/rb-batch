@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-04-30
+
+### Added
+- `Result#failed_items` — unique list of items that errored, in first-failure order (deduplicates retried items)
+- `Result#partial?` — true when some items succeeded and some errored; false on full success or full failure
+
 ## [0.8.0] - 2026-04-16
 
 ### Added

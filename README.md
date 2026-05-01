@@ -169,6 +169,17 @@ result.errors_for(records.first).each do |entry|
 end
 ```
 
+### Partial Success
+
+```ruby
+result = Philiprehberger::Batch.process([1, 2, 3, 4]) do |batch|
+  batch.each { |n| raise "even" if n.even? }
+end
+
+result.partial?      # => true (some succeeded, some failed)
+result.failed_items  # => [2, 4]
+```
+
 ### Concurrency
 
 ```ruby
@@ -204,6 +215,8 @@ result.results    # => collected in chunk order
 | `Result#timing` | Hash of timing stats: `total`, `per_chunk`, `per_item`, `fastest_chunk`, `slowest_chunk` |
 | `Result#filter_errors(error_class)` | Array of `{ item:, error: }` hashes where the error is an instance of the given class |
 | `Result#errors_for(item)` | Array of `{ item:, error: }` hashes for a specific item |
+| `Result#failed_items` | Unique items that errored, in first-failure order |
+| `Result#partial?` | True when some items succeeded and some errored (false on full success or full failure) |
 
 ## Development
 

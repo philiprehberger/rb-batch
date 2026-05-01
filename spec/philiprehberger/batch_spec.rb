@@ -985,5 +985,42 @@ RSpec.describe Philiprehberger::Batch do
         expect(result.errors_for(1)).to eq([])
       end
     end
+
+    describe '#failed_items' do
+      it 'returns the unique items that errored' do
+        errors = [
+          { item: 'a', error: RuntimeError.new('boom') },
+          { item: 'b', error: RuntimeError.new('boom') },
+          { item: 'a', error: ArgumentError.new('retry') }
+        ]
+        result = described_class.new(processed: 1, errors: errors, total: 4, chunks: 1, elapsed: 0.1)
+
+        expect(result.failed_items).to eq(%w[a b])
+      end
+
+      it 'returns an empty array when there are no errors' do
+        result = described_class.new(processed: 3, errors: [], total: 3, chunks: 1, elapsed: 0.1)
+        expect(result.failed_items).to eq([])
+      end
+    end
+
+    describe '#partial?' do
+      it 'is true when some items succeeded and some errored' do
+        errors = [{ item: 'a', error: RuntimeError.new('boom') }]
+        result = described_class.new(processed: 2, errors: errors, total: 3, chunks: 1, elapsed: 0.1)
+        expect(result.partial?).to be(true)
+      end
+
+      it 'is false on full success' do
+        result = described_class.new(processed: 3, errors: [], total: 3, chunks: 1, elapsed: 0.1)
+        expect(result.partial?).to be(false)
+      end
+
+      it 'is false when every item failed' do
+        errors = [{ item: 'a', error: RuntimeError.new('boom') }]
+        result = described_class.new(processed: 0, errors: errors, total: 1, chunks: 1, elapsed: 0.1)
+        expect(result.partial?).to be(false)
+      end
+    end
   end
 end

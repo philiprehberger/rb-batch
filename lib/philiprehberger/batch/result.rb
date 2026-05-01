@@ -115,6 +115,24 @@ module Philiprehberger
         @errors.select { |entry| entry[:item] == item }
       end
 
+      # Return the unique items that failed, in first-failure order.
+      #
+      # Items are deduplicated so retried items aren't double-counted.
+      #
+      # @return [Array] failed items
+      def failed_items
+        @errors.map { |entry| entry[:item] }.uniq
+      end
+
+      # Whether the run partially succeeded — some items processed, some errored.
+      #
+      # Returns false on full success and false when every item failed.
+      #
+      # @return [Boolean]
+      def partial?
+        @processed.positive? && !@errors.empty?
+      end
+
       # Timing statistics for the batch run.
       #
       # @return [Hash] timing breakdown with :total, :per_chunk, :per_item, :fastest_chunk, :slowest_chunk
